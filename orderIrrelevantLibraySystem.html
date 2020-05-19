@@ -1,0 +1,145 @@
+<script src='simpletest.js'></script>
+<script>
+	
+	// library does not have dependencies:
+		// If library does not have dependecies and 1 argument is passed, It should return library
+	
+	// library has dependencies:
+		// If library has dependecies already in libraryStorage and 1 argument is passed, It should return library
+		// If library has dependecies not already in libraryStorage and 1 argument is passed, It should throw an error
+
+	// It should only run library callback 1 time
+
+	(function () {
+		
+		var libraryStorage = {};
+		
+		function librarySystem(libraryName, dependencies, callback) {    
+			
+			// if >1 arguement is passed: store library in libraryStorage
+			if (arguments.length > 1) {
+				libraryStorage[libraryName] = {
+					app: callback,
+					dependencies: dependencies,
+					returned: 0 
+				}
+
+			// if 1 argument return library from libraryStorage
+			} else {
+
+				// if library was not returned previously: return library and store return value in libraryStorage[libraryName]['app']
+				if (!libraryStorage[libraryName]['returned']) {
+				
+					var libraryDependencies = libraryStorage[libraryName]['dependencies'];
+	
+					// Base case: library has no dependencies => return library
+					if (libraryDependencies.length === 0) {
+						
+						var libraryReturn = libraryStorage[libraryName]['app']();
+						libraryStorage[libraryName]['app'] = libraryReturn;
+						libraryStorage[libraryName]['returned'] = 1;
+						
+					// Recursive case: library has dependencies => recursively call librarySystem on dependencies and use 
+					// 								 														 dependency values to return library
+					} else {
+						var dependenciesLoaded = 1;
+
+						// check to see if dependencies already in libraryStorage
+						for (var i = 0; i < libraryDependencies.length; i++) {
+							if (!Boolean( libraryStorage[libraryDependencies[i]] )) {
+								dependenciesLoaded = 0;
+							}
+						};
+	
+						// if library's dependencies are loaded: retrieve dependency values and apply to library callback
+						if (dependenciesLoaded) {
+							var dependencyValues = libraryDependencies.map(function (dependency) {
+								return librarySystem(dependency)
+							});
+							
+							var libraryReturn = libraryStorage[libraryName]['app'].apply(this, dependencyValues);
+							libraryStorage[libraryName]['app'] = libraryReturn;
+							libraryStorage[libraryName]['returned'] = 1;
+	
+						// if dependencies are not loaded: throw error
+						} else {
+							throw new Error('Requested library has dependencies not currently in library storage.');
+						}
+					}
+				}
+
+				return libraryStorage[libraryName]['app'];
+			}
+		}
+		
+		window.librarySystem = librarySystem;
+		
+	})();
+	
+	tests({
+		'If library does not have dependecies and 1 argument is passed, It should return library': function() {
+			librarySystem('firstName', [], function() {
+				return 'Stephen';
+			});
+			eq(librarySystem('firstName'), 'Stephen');
+		},
+
+		'If library has dependecies already in libraryStorage and 1 argument is passed, It should return library': function() {
+			librarySystem('name', [], function() {
+				return 'Stephen';
+			});
+			
+			librarySystem('company', [], function() {
+				return 'Data Clymer';
+			});
+
+			librarySystem('workBlurb', ['name', 'company'], function(name, company) {
+				return name + ' works at ' + company;
+			});
+
+			eq(librarySystem('workBlurb'), 'Stephen works at Data Clymer');
+		},
+
+		'If library has dependecies not already in libraryStorage and 1 argument is passed, It should throw an error.': function() {
+			librarySystem('workBlurb2', ['name2', 'company2'], function(name, company) {
+				return name + ' works at ' + company;
+			});
+
+			librarySystem('name2', [], function() {
+				return 'Stephen';
+			});
+			try {
+				librarySystem('workBlurb2');
+			} catch(e) {
+				var isError = (e instanceof Error);
+			}
+			eq(isError, true);
+		},
+
+		'It should only run library callback 1 time.': function() {
+			var lNcallbackRunCount = 0;
+			var nBcallbackRunCount = 0;
+			
+			librarySystem('lastName', [], function() {
+				lNcallbackRunCount++;
+				return 'Tsoi-A-Sue';
+			});
+			
+			librarySystem('nameBlurb', ['lastName'], function(lastName) {
+				nBcallbackRunCount++;
+				return lastName + ' is my last name.';
+			});
+
+			librarySystem('lastName');
+			librarySystem('lastName');
+			librarySystem('lastName');
+			librarySystem('nameBlurb');
+			librarySystem('nameBlurb');
+			librarySystem('nameBlurb');
+
+			eq(lNcallbackRunCount, 1);
+			eq(nBcallbackRunCount, 1);
+		}
+	})
+	
+</script>
